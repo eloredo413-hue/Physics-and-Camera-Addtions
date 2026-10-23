@@ -539,13 +539,36 @@ print("[Retro Master] Full script loaded successfully.")
 		if not ok then warn("[Physics/Camera] Runtime " .. (label or "") .. ": " .. tostring(e)) end
 	end
 
-	local function saveChoice(choice)
+	local PHYSICS_VARIANTS = {
+		{id = "old",  label = "Old"},
+		{id = "2006", label = "2006"},
+	}
+	local selectedVariant = "old"
+
+	local function variantLabel(id)
+		for _, v in ipairs(PHYSICS_VARIANTS) do
+			if v.id == id then return v.label end
+		end
+		return PHYSICS_VARIANTS[1].label
+	end
+
+	local function runPhysics(variant)
+		if variant == "2006" then
+			local src = fetchPhysics2006Script()
+			if src then runScript(src, "2006 physics") end
+		else
+			runScript(PHYSICS_SRC, "physics")
+		end
+	end
+
+	local function saveChoice(choice, variant)
 		local cfg = {}
 		if readfile and isfile and isfile(CONFIG_FILE) then
 			pcall(function() cfg = HttpService:JSONDecode(readfile(CONFIG_FILE)) end)
 		end
 		if type(cfg) ~= "table" then cfg = {} end
 		cfg.physicsCameraChoice = choice
+		cfg.physicsVariant = variant
 		if writefile then
 			pcall(function() writefile(CONFIG_FILE, HttpService:JSONEncode(cfg)) end)
 		end
@@ -619,33 +642,86 @@ print("[Retro Master] Full script loaded successfully.")
 					yesBtn.Visible = false
 					noBtn.Visible = false
 
+					-- The dropdown list hangs below the frame, so let it draw outside.
+					local oldClips = frame.ClipsDescendants
+					frame.ClipsDescendants = false
+
 					local opts = {
-						{text = "Old Camera",   x = 10,  width = 64, choice = "camera"},
-						{text = "Old Physics",  x = 79,  width = 64, choice = "physics"},
-						{text = "2006 Physics", x = 148, width = 64, choice = "physics2006"},
-						{text = "Both",         x = 217, width = 64, choice = "both"},
-						{text = "None",         x = 286, width = 64, choice = "none"},
+						{text = "Old Camera",  x = 10,  width = 64, choice = "camera"},
+						{text = "Old Physics", x = 79,  width = 64, choice = "physics"},
+						{text = "Both",        x = 217, width = 64, choice = "both"},
+						{text = "None",        x = 286, width = 64, choice = "none"},
 					}
 
 					local myButtons = {}
+					local physicsBtn
+
+					-- Physics type dropdown, sits between the two buttons it affects (Physics and Both)
+					local dropdownBtn = makeButton("", UDim2.new(0, 148, 0, 45), 64, frame)
+					table.insert(myButtons, dropdownBtn)
+
+					local dropdownPad = Instance.new("UIPadding", dropdownBtn)
+					dropdownPad.PaddingRight = UDim.new(0, 12)
+
+					local arrow = Instance.new("TextLabel")
+					arrow.Size = UDim2.new(0, 12, 1, 0)
+					arrow.Position = UDim2.new(1, 0, 0, 0)
+					arrow.BackgroundTransparency = 1
+					arrow.Text = "▼"
+					arrow.FontFace = fontBold
+					arrow.TextSize = 10
+					arrow.TextColor3 = dropdownBtn.TextColor3
+					arrow.ZIndex = dropdownBtn.ZIndex + 1
+					arrow.Parent = dropdownBtn
+					dropdownBtn:GetPropertyChangedSignal("TextColor3"):Connect(function()
+						arrow.TextColor3 = dropdownBtn.TextColor3
+					end)
+
+					local function refreshVariantText()
+						local label = variantLabel(selectedVariant)
+						dropdownBtn.Text = label
+						if physicsBtn then physicsBtn.Text = label .. " Physics" end
+					end
+
+					local listItems = {}
+					local function setListOpen(open)
+						for _, item in ipairs(listItems) do item.Visible = open end
+					end
+
+					for i, v in ipairs(PHYSICS_VARIANTS) do
+						local item = makeButton(v.label .. " Physics", UDim2.new(0, 148, 0, 45 + 32 * i), 64, frame)
+						item.ZIndex = 10
+						item.Visible = false
+						table.insert(listItems, item)
+						table.insert(myButtons, item)
+
+						item.MouseButton1Click:Connect(function()
+							playClick()
+							selectedVariant = v.id
+							refreshVariantText()
+							setListOpen(false)
+						end)
+					end
+
+					dropdownBtn.MouseButton1Click:Connect(function()
+						playClick()
+						setListOpen(not listItems[1].Visible)
+					end)
 
 					for _, opt in ipairs(opts) do
 						local btn = makeButton(opt.text, UDim2.new(0, opt.x, 0, 45), opt.width, frame)
 						table.insert(myButtons, btn)
+						if opt.choice == "physics" then physicsBtn = btn end
 
 						btn.MouseButton1Click:Connect(function()
 							playClick()
-							print("[Physics/Camera] Picked " .. opt.choice)
-							saveChoice(opt.choice)
+							setListOpen(false)
+							local variant = selectedVariant
+							print("[Physics/Camera] Picked " .. opt.choice .. " (physics: " .. variant .. ")")
+							saveChoice(opt.choice, variant)
 
 							if opt.choice == "physics" or opt.choice == "both" then
-								task.spawn(function() runScript(PHYSICS_SRC, "physics") end)
-							end
-							if opt.choice == "physics2006" then
-								task.spawn(function()
-									local src = fetchPhysics2006Script()
-									if src then runScript(src, "2006 physics") end
-								end)
+								task.spawn(function() runPhysics(variant) end)
 							end
 							if opt.choice == "camera" or opt.choice == "both" then
 								task.spawn(function()
@@ -666,6 +742,7 @@ print("[Retro Master] Full script loaded successfully.")
 								if b and b.Parent then b:Destroy() end
 							end
 							myButtons = {}
+							frame.ClipsDescendants = oldClips
 
 							titleLabel.Text = "Do you want better emotes?"
 							yesBtn.Visible = true
@@ -682,6 +759,8 @@ print("[Retro Master] Full script loaded successfully.")
 						end)
 					end
 
+					refreshVariantText()
+
 					return
 				end
 			end
@@ -692,21 +771,19 @@ print("[Retro Master] Full script loaded successfully.")
 	if readfile and isfile and isfile(CONFIG_FILE) then
 		pcall(function()
 			local cfg = HttpService:JSONDecode(readfile(CONFIG_FILE))
-			if type(cfg) == "table" and cfg.physicsCameraChoice then
+			if type(cfg) == "table" then
 				savedChoice = cfg.physicsCameraChoice
+				if type(cfg.physicsVariant) == "string" then
+					selectedVariant = cfg.physicsVariant
+				end
 			end
 		end)
 	end
 
 	if savedChoice and savedChoice ~= "none" then
 		if savedChoice == "physics" or savedChoice == "both" then
-			task.spawn(function() runScript(PHYSICS_SRC, "physics") end)
-		end
-		if savedChoice == "physics2006" then
-			task.spawn(function()
-				local src = fetchPhysics2006Script()
-				if src then runScript(src, "2006 physics") end
-			end)
+			local variant = selectedVariant
+			task.spawn(function() runPhysics(variant) end)
 		end
 		if savedChoice == "camera" or savedChoice == "both" then
 			task.spawn(function()
