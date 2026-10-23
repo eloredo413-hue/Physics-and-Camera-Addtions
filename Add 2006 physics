@@ -767,31 +767,14 @@ print("[Retro Master] Full script loaded successfully.")
 		end
 	end)
 
-	local savedChoice
+	-- Only restore the dropdown's last physics type; nothing runs until a button is clicked.
 	if readfile and isfile and isfile(CONFIG_FILE) then
 		pcall(function()
 			local cfg = HttpService:JSONDecode(readfile(CONFIG_FILE))
-			if type(cfg) == "table" then
-				savedChoice = cfg.physicsCameraChoice
-				if type(cfg.physicsVariant) == "string" then
-					selectedVariant = cfg.physicsVariant
-				end
+			if type(cfg) == "table" and type(cfg.physicsVariant) == "string" then
+				selectedVariant = cfg.physicsVariant
 			end
 		end)
-	end
-
-	if savedChoice and savedChoice ~= "none" then
-		if savedChoice == "physics" or savedChoice == "both" then
-			local variant = selectedVariant
-			task.spawn(function() runPhysics(variant) end)
-		end
-		if savedChoice == "camera" or savedChoice == "both" then
-			task.spawn(function()
-				local src = fetchCameraScript()
-				if src then runScript(src, "camera") end
-			end)
-		end
-		print("[Physics/Camera] Applied saved choice: " .. savedChoice)
 	end
 
 	print("[Physics/Camera Step] Loaded.")
