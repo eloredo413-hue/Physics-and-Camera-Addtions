@@ -9,6 +9,7 @@ task.spawn(function()
 
 	local CONFIG_FILE = "BloxyParadoxConfig.json"
 	local CAMERA_URL = "https://gist.githubusercontent.com/eloredo413-hue/81660979f9506a61e0344f32a8096f96/raw/05a2619b3a2737d7c4a97814650f8980e103c5ef/Retro%2520camera"
+	local PHYSICS_2006_URL = "https://gist.githubusercontent.com/eloredo413-hue/03ef8e46682bfb53e26e6847abfde344/raw/0fb71153c3b4a369a0390228a2bec3a4a5655c56/2006%2520Physics"
 
 	local player = Players.LocalPlayer
 	local pg = player:WaitForChild("PlayerGui", 15)
@@ -507,6 +508,23 @@ print("[Retro Master] Full script loaded successfully.")
 		return nil
 	end
 
+	local PHYSICS_2006_SRC = nil
+
+	local function fetchPhysics2006Script()
+		if PHYSICS_2006_SRC then return PHYSICS_2006_SRC end
+		print("[Physics/Camera] Fetching 2006 physics script...")
+		local ok, src = pcall(function()
+			return game:HttpGet(PHYSICS_2006_URL, true)
+		end)
+		if ok and type(src) == "string" and #src > 100 then
+			PHYSICS_2006_SRC = src
+			print("[Physics/Camera] 2006 physics script fetched (" .. #src .. " bytes).")
+			return src
+		end
+		warn("[Physics/Camera] Failed to fetch 2006 physics script.")
+		return nil
+	end
+
 	local function runScript(src, label)
 		if not src or #src < 100 then
 			warn("[Physics/Camera] " .. (label or "") .. " script is empty.")
@@ -602,10 +620,11 @@ print("[Retro Master] Full script loaded successfully.")
 					noBtn.Visible = false
 
 					local opts = {
-						{text = "Old Camera",  x = 14,  width = 80, choice = "camera"},
-						{text = "Old Physics", x = 98,  width = 80, choice = "physics"},
-						{text = "Both",        x = 182, width = 80, choice = "both"},
-						{text = "None",        x = 266, width = 80, choice = "none"},
+						{text = "Old Camera",   x = 10,  width = 64, choice = "camera"},
+						{text = "Old Physics",  x = 79,  width = 64, choice = "physics"},
+						{text = "2006 Physics", x = 148, width = 64, choice = "physics2006"},
+						{text = "Both",         x = 217, width = 64, choice = "both"},
+						{text = "None",         x = 286, width = 64, choice = "none"},
 					}
 
 					local myButtons = {}
@@ -621,6 +640,12 @@ print("[Retro Master] Full script loaded successfully.")
 
 							if opt.choice == "physics" or opt.choice == "both" then
 								task.spawn(function() runScript(PHYSICS_SRC, "physics") end)
+							end
+							if opt.choice == "physics2006" then
+								task.spawn(function()
+									local src = fetchPhysics2006Script()
+									if src then runScript(src, "2006 physics") end
+								end)
 							end
 							if opt.choice == "camera" or opt.choice == "both" then
 								task.spawn(function()
@@ -676,6 +701,12 @@ print("[Retro Master] Full script loaded successfully.")
 	if savedChoice and savedChoice ~= "none" then
 		if savedChoice == "physics" or savedChoice == "both" then
 			task.spawn(function() runScript(PHYSICS_SRC, "physics") end)
+		end
+		if savedChoice == "physics2006" then
+			task.spawn(function()
+				local src = fetchPhysics2006Script()
+				if src then runScript(src, "2006 physics") end
+			end)
 		end
 		if savedChoice == "camera" or savedChoice == "both" then
 			task.spawn(function()
