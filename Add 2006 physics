@@ -690,8 +690,11 @@ print("[Retro Master] Full script loaded successfully.")
 
 					for i, v in ipairs(PHYSICS_VARIANTS) do
 						local item = makeButton(v.label .. " Physics", UDim2.new(0, 148, 0, 45 + 32 * i), 64, frame)
-						item.ZIndex = 10
+						item.ZIndex = 20
 						item.Visible = false
+						-- Bring the hovered item above its neighbours so its whole outline shows
+						item.MouseEnter:Connect(function() item.ZIndex = 21 end)
+						item.MouseLeave:Connect(function() item.ZIndex = 20 end)
 						table.insert(listItems, item)
 						table.insert(myButtons, item)
 
